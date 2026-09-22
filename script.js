@@ -1,0 +1,81 @@
+const root=document.documentElement;
+const originalTitle=document.title;
+const nodes=[];
+const walk=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,{acceptNode:n=>n.parentElement&&!['SCRIPT','STYLE'].includes(n.parentElement.tagName)&&n.nodeValue.trim()?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_REJECT});
+while(walk.nextNode())nodes.push([walk.currentNode,walk.currentNode.nodeValue.trim()]);
+const langs={en:'English',de:'Deutsch',cs:'Čeština',es:'Español',zh:'中文',ru:'Русский',hi:'हिन्दी',ar:'العربية'};
+const menu=document.querySelector('.lang-menu');
+menu.innerHTML=Object.entries(langs).map(([c,n])=>'<button data-lang="'+c+'"><span>'+n+'</span><small>'+c.toUpperCase()+'</small></button>').join('');
+async function tx(t,c){const k='enkrion:'+c+':'+t,v=localStorage.getItem(k);
+if(v)return v;
+const r=await fetch('https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl='+c+'&dt=t&q='+encodeURIComponent(t));
+const d=await r.json(),x=d[0].map(a=>a[0]).join('');
+localStorage.setItem(k,x);
+return x}let run=0;
+async function language(c){const id=++run;
+root.lang=c;
+root.dir=c==='ar'?'rtl':'ltr';
+localStorage.setItem('enkrion-lang',c);
+document.querySelector('.lang').textContent=c.toUpperCase();
+if(c==='en'){nodes.forEach(([n,t])=>n.nodeValue=n.nodeValue.replace(n.nodeValue.trim(),t));
+document.title=originalTitle;
+return}let i=0;
+async function worker(){while(i<nodes.length){const [n,t]=nodes[i++];
+if(!/[A-Za-z]/.test(t)||t==='ENKRION'||t==='ORIN')continue;
+try{const v=await tx(t,c);
+if(id===run)n.nodeValue=n.nodeValue.replace(n.nodeValue.trim(),v)}catch{}}}await Promise.all([worker(),worker(),worker(),worker(),worker()]);
+try{document.title=await tx(originalTitle,c)}catch{}}document.querySelector('.lang').onclick=e=>{e.stopPropagation();
+menu.classList.toggle('open')};
+menu.querySelectorAll('button').forEach(b=>b.onclick=()=>{language(b.dataset.lang);
+menu.classList.remove('open')});
+document.addEventListener('click',()=>menu.classList.remove('open'));
+const theme=document.querySelector('.theme');
+root.dataset.theme=localStorage.getItem('enkrion-theme')||'dark';
+theme.onclick=()=>{root.dataset.theme=root.dataset.theme==='light'?'dark':'light';
+localStorage.setItem('enkrion-theme',root.dataset.theme)};
+const choices=['cobalt','violet','ember','arctic'];
+let pi=choices.indexOf(localStorage.getItem('enkrion-palette')||'cobalt');
+root.dataset.palette=choices[pi];
+document.querySelector('.palette').onclick=()=>{pi=(pi+1)%choices.length;
+root.dataset.palette=choices[pi];
+localStorage.setItem('enkrion-palette',choices[pi])};
+const obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('show');
+obs.unobserve(e.target)}}),{threshold:.12});
+document.querySelectorAll('.section .label,.section h2,.split>*,.principles article,.work-card,.team-head>*,.people article,.closing>*').forEach((e,i)=>{e.classList.add('reveal');
+e.style.transitionDelay=(i%5)*60+'ms';
+obs.observe(e)});
+language(localStorage.getItem('enkrion-lang')||'en');
+const productSection=document.querySelector('.product');
+const productOrb=document.querySelector('.product-orb');
+const productMark=document.querySelector('.product-orb .orb');
+const productCopy=document.querySelector('.product-copy');
+const heroMark=document.querySelector('.hero-mark');
+productSection?.querySelector('.product-sticky')?.insertAdjacentHTML('beforeend','<div class="scroll-cue" aria-hidden="true"></div>');
+let scrollTick=false;
+function clamp(value,min=0,max=1){return Math.min(max,Math.max(min,value))}
+function renderScrollStory(){
+  scrollTick=false;
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  const box=productSection?.getBoundingClientRect();
+  if(productSection&&box){
+    const travel=productSection.offsetHeight-innerHeight;
+    const progress=clamp(-box.top/Math.max(travel,1));
+    const reveal=clamp(progress/.46);
+    const copyIn=clamp((progress-.35)/.32);
+    const settle=clamp((progress-.72)/.28);
+    productSection.style.setProperty('--product-progress',progress.toFixed(3));
+    productMark.style.transform='perspective(1100px) rotateX('+(58*(1-reveal))+'deg) rotateY('+(-38*(1-reveal)+settle*12)+'deg) rotateZ('+(10*(1-reveal))+'deg) scale('+(1.95-reveal*.9-settle*.08)+')';
+    productMark.style.filter='blur('+(18*(1-reveal))+'px) brightness('+(1.7-reveal*.65)+') drop-shadow(0 35px 70px rgba(0,0,0,.65))';
+    productOrb.style.transform='translate3d('+(22*(1-reveal))+'vw,'+((1-reveal)*80-settle*28)+'px,0)';
+    productOrb.style.opacity=String(.25+reveal*.75);
+    productCopy.style.transform='translate3d('+-60*(1-copyIn)+'px,'+(45*(1-copyIn))+'px,0)';
+    productCopy.style.opacity=String(copyIn);
+  }
+  if(heroMark){
+    const y=scrollY;
+    heroMark.style.transform='translate3d(0,'+(Math.min(y*.13,80))+'px,0) rotate('+(Math.min(y*.006,4))+'deg) scale('+(1-Math.min(y/7000,.06))+')';
+  }
+}
+addEventListener('scroll',()=>{if(!scrollTick){scrollTick=true;requestAnimationFrame(renderScrollStory)}},{passive:true});
+addEventListener('resize',renderScrollStory);
+renderScrollStory();
